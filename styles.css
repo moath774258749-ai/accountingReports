@@ -1,0 +1,366 @@
+/* ============================================
+   نظام إدارة المتجر الذكي - ملف الأنماط
+   ============================================ */
+
+/* ملحقات إضافية للأنماط */
+
+/* تأثيرات حركية */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from { 
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to { 
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.3s ease;
+}
+
+.animate-slide-up {
+    animation: slideUp 0.3s ease;
+}
+
+/* تحسينات الجداول */
+.table-responsive {
+    overflow-x: auto;
+}
+
+.table-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* حقول النموذج */
+.form-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.form-col {
+    flex: 1;
+}
+
+/* بطاقات الإحصائيات المخصصة */
+.stat-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+/* أزرار الأيقوات */
+.icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    border: none;
+    background: var(--light);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.icon-btn:hover {
+    background: var(--primary);
+    color: white;
+}
+
+/* شريط التحميل */
+.loading-bar {
+    width: 100%;
+    height: 4px;
+    background: var(--light);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.loading-progress {
+    height: 100%;
+    background: var(--primary);
+    animation: loading 1.5s ease infinite;
+}
+
+@keyframes loading {
+    0% { width: 0; }
+    50% { width: 70%; }
+    100% { width: 100%; }
+}
+
+/* تمييز النص */
+.text-success { color: var(--success); }
+.text-danger { color: var(--danger); }
+.text-warning { color: var(--warning); }
+.text-primary { color: var(--primary); }
+.text-gray { color: var(--gray); }
+
+/* خلفية ألوان */
+.bg-success { background-color: var(--success); }
+.bg-danger { background-color: var(--danger); }
+.bg-warning { background-color: var(--warning); }
+.bg-primary { background-color: var(--primary); }
+
+/* هوامش وأحجام */
+.mt-1 { margin-top: 4px; }
+.mt-2 { margin-top: 8px; }
+.mt-3 { margin-top: 12px; }
+.mt-4 { margin-top: 16px; }
+
+.mb-1 { margin-bottom: 4px; }
+.mb-2 { margin-bottom: 8px; }
+.mb-3 { margin-bottom: 12px; }
+.mb-4 { margin-bottom: 16px; }
+
+.p-1 { padding: 4px; }
+.p-2 { padding: 8px; }
+.p-3 { padding: 12px; }
+.p-4 { padding: 16px; }
+
+/* تصاميم خاصة */
+.product-card-selected {
+    border-color: var(--success);
+    background: #dcfce7;
+}
+
+.dark .product-card-selected {
+    background: #166534;
+}
+
+/* فاصل */
+.divider {
+    height: 1px;
+    background: var(--border);
+    margin: 16px 0;
+}
+
+/* مجموعة الأزرار */
+.btn-group {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-group .btn {
+    margin: 0;
+}
+
+/* ملصقات الحالة */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.status-online .status-dot {
+    background: var(--success);
+}
+
+.status-offline .status-dot {
+    background: var(--danger);
+}
+
+/* تحسينات للنماذج */
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.input-group label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--dark);
+}
+
+.dark .input-group label {
+    color: var(--dark);
+}
+
+/* مؤشرات خاصة */
+.stock-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.stock-bar {
+    width: 60px;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.stock-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.stock-fill.high {
+    background: var(--success);
+}
+
+.stock-fill.medium {
+    background: var(--warning);
+}
+
+.stock-fill.low {
+    background: var(--danger);
+}
+
+/* معلومات المنتج في الـ POS */
+.product-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.product-meta {
+    font-size: 12px;
+    color: var(--gray);
+}
+
+/* تفاصيل الفاتورة */
+.invoice-details {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    background: var(--light);
+    border-radius: 8px;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+}
+
+.detail-label {
+    color: var(--gray);
+}
+
+.detail-value {
+    font-weight: 600;
+}
+
+/* تحسينات للشاشات الصغيرة */
+@media (max-width: 640px) {
+    .pos-layout {
+        grid-template-columns: 1fr;
+    }
+    
+    .stat-value {
+        font-size: 20px;
+    }
+    
+    .product-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* قائمة التنقل في الأجهزة المحمولة */
+.mobile-nav {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    padding: 8px;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    z-index: 100;
+}
+
+.dark .mobile-nav {
+    background: var(--dark);
+}
+
+@media (max-width: 768px) {
+    .mobile-nav {
+        display: flex;
+        justify-content: space-around;
+    }
+    
+    .main-content {
+        padding-bottom: 80px;
+    }
+}
+
+.mobile-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px;
+    color: var(--gray);
+    font-size: 10px;
+    cursor: pointer;
+}
+
+.mobile-nav-item.active {
+    color: var(--primary);
+}
+
+.mobile-nav-item i {
+    font-size: 20px;
+}
+
+/* التحقق من الحقول */
+.input-error {
+    border-color: var(--danger) !important;
+}
+
+.error-message {
+    color: var(--danger);
+    font-size: 12px;
+    margin-top: 4px;
+}
+
+/* حالة فارغة محسنة */
+.empty-state-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    text-align: center;
+}
+
+.empty-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: var(--light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    color: var(--gray);
+    margin-bottom: 16px;
+}

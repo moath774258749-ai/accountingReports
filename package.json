@@ -1,0 +1,14 @@
+{
+  "name": "smart-store-erp",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Offline POS + Inventory + Accounting (IndexedDB)",
+  "scripts": {
+    "start": "npx --yes serve . -p 8080",
+    "electron": "electron electron-main.js"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "serve": "^14.2.0"
+  }
+}
