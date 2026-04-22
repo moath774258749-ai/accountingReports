@@ -3,7 +3,7 @@
  */
 
 const DB_NAME = 'SmartStoreDB';
-const DB_VERSION = 4;
+const DB_VERSION = 6;
 
 export class Database {
     constructor() {

@@ -68,7 +68,7 @@ export class SmartStoreApp {
         this.cartTotal = 0;
         this.cartCost = 0;
         this.cartSubtotal = 0;
-this.accountingTab = 'customers';
+        this.accountingTab = 'customers';
         this.lastStatement = null;
     }
 
@@ -165,19 +165,24 @@ this.accountingTab = 'customers';
     }
 
     checkAuth() {
+        console.log('[checkAuth] Checking authentication state...');
         const legacy = sessionStorage.getItem('current_user');
         if (legacy && !sessionStorage.getItem('current_session')) {
             try {
                 const u = JSON.parse(legacy);
                 writeSession(createSessionPayload(u));
                 sessionStorage.removeItem('current_user');
+                console.log('[checkAuth] Migrated legacy session');
             } catch { /* ignore */ }
         }
         const user = readSession(SESSION_TTL_MS);
+        console.log('[checkAuth] Session user:', user);
         if (user) {
             this.currentUser = user;
             this.showApp();
             this.logActivity('تسجيل دخول', `دخول المستخدم ${this.currentUser.name}`);
+        } else {
+            console.log('[checkAuth] No valid session, showing login screen');
         }
     }
 
@@ -422,18 +427,23 @@ this.accountingTab = 'customers';
 
     async handleLogin() {
         try {
+            console.log('[Login] Starting login process...');
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
+            console.log('[Login] Username:', username);
             if (!username || !password) {
                 this.showToast('الرجاء إدخال اسم المستخدم وكلمة المرور', 'error');
                 return;
             }
             const users = await this.db.getAll('users');
+            console.log('[Login] Found users:', users.length);
             const user = users.find((u) => u.username === username && u.active !== false);
             if (!user || !(await verifyPassword(password, user.password))) {
+                console.log('[Login] Invalid credentials');
                 this.showToast('اسم المستخدم أو كلمة المرور خطأ', 'error');
                 return;
             }
+            console.log('[Login] User authenticated:', user.username, 'Role:', user.role);
             if (!user.password.startsWith('pbkdf2$')) {
                 const newHash = await hashPassword(password);
                 await this.db.put('users', { ...user, password: newHash });
@@ -444,12 +454,15 @@ this.accountingTab = 'customers';
                 role: user.role,
                 name: user.name
             };
-            writeSession(createSessionPayload(user));
+            const sessionPayload = createSessionPayload(user);
+            writeSession(sessionPayload);
+            console.log('[Login] Session written to sessionStorage');
             this.showApp();
             this.logActivity('تسجيل دخول', `دخول المستخدم ${user.name}`);
             this.showToast(`مرحباً ${user.name}`, 'success');
+            console.log('[Login] Login complete, navigating to dashboard');
         } catch (e) {
-            console.error('Login error:', e);
+            console.error('[Login] Login error:', e);
         }
     }
 
@@ -462,8 +475,11 @@ this.accountingTab = 'customers';
     }
 
     showApp() {
+        console.log('[showApp] Hiding login screen, showing app layout');
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('app-layout').style.display = 'block';
+        console.log('[showApp] Login screen display:', document.getElementById('login-screen').style.display);
+        console.log('[showApp] App layout display:', document.getElementById('app-layout').style.display);
         document.getElementById('user-display').textContent = this.currentUser.name;
         const badge = document.getElementById('mode-badge');
         if (this.currentUser.role === ROLES.CASHIER) {
@@ -474,6 +490,7 @@ this.accountingTab = 'customers';
         }
         this.applyNavVisibility();
         this.checkBackupReminder();
+        console.log('[showApp] Current user role:', this.currentUser.role);
         if (this.currentUser.role === ROLES.CASHIER) {
             this.navigateTo('pos');
         } else {
@@ -939,7 +956,6 @@ ${invoice.discount > 0 ? `<div class="total-row"><span>الخصم:</span><span>-
         w.document.write(html);
         w.document.close();
         w.print();
-    }
     }
 
     async loadInventory() {
