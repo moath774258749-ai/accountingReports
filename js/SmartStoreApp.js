@@ -136,7 +136,8 @@ export class SmartStoreApp {
             const defaultUsers = [
                 { username: 'admin', password: await hashPassword('admin123'), role: 'admin', name: 'مدير', active: true },
                 { username: 'manager', password: await hashPassword('manager123'), role: 'manager', name: 'مدير عام', active: true },
-                { username: 'cashier', password: await hashPassword('cashier123'), role: 'cashier', name: 'كاشير', active: true }
+                { username: 'cashier', password: await hashPassword('cashier123'), role: 'cashier', name: 'كاشير', active: true },
+                { username: 'developer', password: await hashPassword('dev123'), role: 'developer', name: 'مطور', active: true }
             ];
             for (const user of defaultUsers) {
                 await this.db.add('users', user);
@@ -230,6 +231,7 @@ export class SmartStoreApp {
         if (!this.currentUser) return false;
         const role = this.currentUser.role;
         if (role === ROLES.ADMIN) return true;
+        if (role === ROLES.DEVELOPER) return true;
         if (role === ROLES.MANAGER) {
             return ['dashboard', 'pos', 'inventory', 'customers', 'expenses', 'accounting', 'activity'].includes(screen);
         }
@@ -249,6 +251,9 @@ export class SmartStoreApp {
             }
             if (role === ROLES.CASHIER) {
                 ok = s === 'pos' || s === 'accounting';
+            }
+            if (role === ROLES.DEVELOPER) {
+                ok = true;
             }
             link.closest('.nav-item').style.display = ok ? '' : 'none';
         });
@@ -301,6 +306,37 @@ export class SmartStoreApp {
         document.getElementById('close-expense-modal').addEventListener('click', () => this.closeExpenseModal());
         document.getElementById('save-settings').addEventListener('click', () => this.saveSettings());
         document.getElementById('store-logo-input')?.addEventListener('change', (e) => this.handleLogoUpload(e));
+        document.getElementById('reset-system-btn')?.addEventListener('click', () => this.resetSystem());
+        document.getElementById('add-purchase-invoice-btn')?.addEventListener('click', () => this.openPurchaseModal());
+        document.getElementById('add-purchase-return-btn')?.addEventListener('click', () => this.openReturnModal());
+        document.getElementById('purchase-payment-method')?.addEventListener('change', (e) => {
+            const group = document.getElementById('paid-amount-group');
+            if (group) group.style.display = e.target.value === 'cash' ? 'block' : 'none';
+        });
+        
+        // تبويبات المشتريات
+        document.querySelectorAll('[data-purchase-tab]').forEach((tab) => {
+            tab.addEventListener('click', (e) => {
+                const tabName = e.currentTarget.dataset.purchaseTab;
+                document.querySelectorAll('[data-purchase-tab]').forEach((t) => t.classList.remove('active'));
+                e.currentTarget.classList.add('active');
+                
+                const invoicesCard = document.querySelector('.card:has(#purchase-invoices-tbody)');
+                const returnsCard = document.getElementById('purchase-returns-card');
+                
+                if (tabName === 'invoices') {
+                    if (invoicesCard) invoicesCard.style.display = 'block';
+                    if (returnsCard) returnsCard.style.display = 'none';
+                    document.getElementById('add-purchase-invoice-btn').style.display = 'inline-block';
+                    document.getElementById('add-purchase-return-btn').style.display = 'none';
+                } else {
+                    if (invoicesCard) invoicesCard.style.display = 'none';
+                    if (returnsCard) returnsCard.style.display = 'block';
+                    document.getElementById('add-purchase-invoice-btn').style.display = 'none';
+                    document.getElementById('add-purchase-return-btn').style.display = 'inline-block';
+                }
+            });
+        });
         document.getElementById('dark-mode-toggle').addEventListener('click', () => this.toggleDarkMode());
         document.querySelectorAll('[data-report]').forEach((tab) => {
             tab.addEventListener('click', (e) => this.showReport(e.currentTarget.dataset.report));
@@ -558,6 +594,7 @@ export class SmartStoreApp {
                 }
                 this.loadSettingsScreen(); break;
             case 'activity': this.loadActivity(); break;
+            case 'purchasing': this.loadPurchasingScreen(); break;
             case 'accounting': this.loadAccounting(); break;
             default: break;
         }
@@ -653,14 +690,25 @@ export class SmartStoreApp {
 
     getDisplayStock(product) {
         const units = convertStock(product.stock);
-        return `كرتون: ${units.boxes} | عروسة: ${units.packs} | حبة: ${units.pieces}`;
+        return `${units.boxes} كرتون`;
     }
 
     searchProducts(query) {
         if (this.searchTimeout) clearTimeout(this.searchTimeout);
+        if (!query) {
+            this.getProducts().then((ps) => this.renderProducts(ps));
+            return;
+        }
         this.searchTimeout = setTimeout(() => {
             this.getProducts().then((products) => {
                 const q = query.toLowerCase();
+                const exactBarcode = products.find((p) => p.barcode && p.barcode.toLowerCase() === q);
+                if (exactBarcode) {
+                    this.addToCart(exactBarcode.id);
+                    document.getElementById('pos-search').value = '';
+                    this.getProducts().then((ps) => this.renderProducts(ps));
+                    return;
+                }
                 const filtered = products.filter((p) =>
                     p.name.toLowerCase().includes(q) || (p.barcode && p.barcode.toLowerCase().includes(q))
                 );
@@ -782,8 +830,16 @@ export class SmartStoreApp {
         this.showToast('تم إلغاء السلة', 'success');
     }
 
-    generateInvoiceNumber() {
-        return `INV-${crypto.randomUUID().replace(/-/g, '').toUpperCase().slice(0, 20)}`;
+    async generateInvoiceNumber() {
+        const seq = (await this.db.getMeta('invoice_seq')) || 1;
+        await this.db.setMeta('invoice_seq', seq + 1);
+        return `INV-${String(seq).padStart(5, '0')}`;
+    }
+
+    async generateCustomerNumber() {
+        const seq = (await this.db.getMeta('customer_seq')) || 1;
+        await this.db.setMeta('customer_seq', seq + 1);
+        return `CUST-${String(seq).padStart(3, '0')}`;
     }
 
     async completeSale() {
@@ -801,7 +857,7 @@ export class SmartStoreApp {
         const discount = clampDiscount(this.cartSubtotalFromCart(), parseFloat(document.getElementById('discount-input').value) || 0);
         const paymentMethod = document.getElementById('payment-method').value;
         const paidInput = document.getElementById('paid-now-input')?.value;
-        const invoiceNumber = this.generateInvoiceNumber();
+        const invoiceNumber = await this.generateInvoiceNumber();
         const totals = computeCartTotals(this.cart);
 
         const nameInput = document.getElementById('customer-name-input').value;
@@ -1178,10 +1234,12 @@ ${invoice.discount > 0 ? `<div class="total-row"><span>الخصم:</span><span>-
             const prev = await this.db.get('customers', parseInt(id, 10));
             data.id = parseInt(id, 10);
             data.balance = prev.balance || 0;
+            data.customer_code = prev.customer_code || await this.generateCustomerNumber();
             await this.db.put('customers', data);
             await this.syncPartyBalanceFromGl('customer', data.id);
             this.showToast('تم التعديل بنجاح', 'success');
         } else {
+            data.customer_code = await this.generateCustomerNumber();
             const newId = await this.db.add('customers', data);
             await this.syncPartyBalanceFromGl('customer', newId);
             this.showToast('تم الإضافة بنجاح', 'success');
@@ -1413,7 +1471,7 @@ ${invoice.discount > 0 ? `<div class="total-row"><span>الخصم:</span><span>-
             </div>
             ${lines.length === 0 ? '<p>لا حركات لهذا الحساب في الفترة</p>' : `
             <table class="table">
-                <thead><tr><th>التاريخ</th><th>البيان</th><th>مرجع</th><th>مدين</th><th>دائن</th><th>أثر</th><th>الرصيد الجاري</th></tr></thead>
+                <thead><tr><th>التاريخ</th><th>البيان</th><th>مرجع</th><th>مدين</th><th>دائن</th><th>الرصيد الجاري</th></tr></thead>
                 <tbody>
                     ${lines.map((ln) => `<tr>
                         <td>${escapeHtml(String(ln.created_at || ''))}</td>
@@ -1421,7 +1479,6 @@ ${invoice.discount > 0 ? `<div class="total-row"><span>الخصم:</span><span>-
                         <td>${escapeHtml(ln.ref_key)}</td>
                         <td>${this.formatCurrency(ln.debit)}</td>
                         <td>${this.formatCurrency(ln.credit)}</td>
-                        <td>${this.formatCurrency(ln.delta)}</td>
                         <td>${this.formatCurrency(ln.running)}</td>
                     </tr>`).join('')}
                 </tbody>
@@ -1539,7 +1596,7 @@ ${invoice.discount > 0 ? `<div class="total-row"><span>الخصم:</span><span>-
             const entries = filterEntriesByDate(all, from, to, (iso, f, t) => this._inDateRange(iso, f, t));
             const code = document.getElementById('ledger-account-filter')?.value || AC.CASH;
             const lines = buildGeneralLedger(entries, code);
-            rows = [['التاريخ', 'البيان', 'مرجع', 'مدين', 'دائن', 'أثر', 'رصيد جاري']];
+            rows = [['التاريخ', 'البيان', 'مرجع', 'مدين', 'دائن', 'الرصيد الجاري']];
             lines.forEach((ln) => rows.push([
                 String(ln.created_at || ''),
                 ln.memo || '',
@@ -1625,6 +1682,33 @@ ${invoice.discount > 0 ? `<div class="total-row"><span>الخصم:</span><span>-
         this.showToast('تم حفظ الإعدادات بنجاح', 'success');
     }
 
+    async resetSystem() {
+        if (this.currentUser.role !== 'developer') {
+            this.showToast('ليس لديك صلاحية لإعادة تعيين النظام', 'error');
+            return;
+        }
+        if (!confirm('هل أنت متأكد من رغبتك في إعادة تعيين النظام؟ سيتم حذف جميع البيانات!')) {
+            return;
+        }
+        if (!confirm('تحذير: هذا الإجراء لا يمكن التراجع عنه. هل أنت متأكد فعلاً؟')) {
+            return;
+        }
+        try {
+            const stores = ['products', 'customers', 'suppliers', 'invoices', 'vouchers', 'expenses', 'account_entries', 'users', 'activity_log', 'meta'];
+            for (const store of stores) {
+                const items = await this.db.getAll(store);
+                for (const item of items) {
+                    await this.db.delete(store, item.id || item.key);
+                }
+            }
+            await this.seedDataIfNeeded();
+            this.showToast('تم إعادة تعيين النظام بنجاح', 'success');
+            setTimeout(() => window.location.reload(), 1500);
+        } catch (err) {
+            this.showToast('حدث خطأ أثناء إعادة التعيين: ' + err.message, 'error');
+        }
+    }
+
     async handleLogoUpload(e) {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -1652,6 +1736,10 @@ ${invoice.discount > 0 ? `<div class="total-row"><span>الخصم:</span><span>-
     async loadSettingsScreen() {
         await this.loadSettings();
         await this.showLogoInHeader();
+        const resetBtn = document.getElementById('reset-system-btn');
+        if (resetBtn) {
+            resetBtn.style.display = this.currentUser.role === 'developer' ? 'inline-flex' : 'none';
+        }
         const uc = document.getElementById('users-admin-card');
         const bc = document.getElementById('backup-card');
         if (uc) uc.style.display = this.hasPermission('manage_users') ? 'block' : 'none';
@@ -1867,7 +1955,7 @@ ${invoice.discount > 0 ? `<div class="total-row"><span>الخصم:</span><span>-
             return;
         }
         const seq = (await this.db.getMeta('voucher_seq')) || 1;
-        const num = `VC-${String(seq).padStart(6, '0')}`;
+        const num = `VCH-${String(seq).padStart(5, '0')}`;
         const now = new Date().toISOString();
         const voucher = {
             voucher_number: num,
@@ -2011,7 +2099,7 @@ ${logoImg}
         }
         
         this.lastStatement = { partyType, partyId, key, entries };
-        out.innerHTML = `<h4>كشف حساب: ${escapeHtml(partyName)}</h4><table class="table"><thead><tr><th>التاريخ</th><th>البيان</th><th>مدين</th><th>دائن</th><th>أثر الرصيد</th><th>الرصيد</th></tr></thead><tbody>${
+        out.innerHTML = `<h4>كشف حساب: ${escapeHtml(partyName)}</h4><table class="table"><thead><tr><th>التاريخ</th><th>البيان</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr></thead><tbody>${
             entries.map((e) => {
                 const delta = entryPartyRunningDelta(e);
                 bal += delta;
@@ -2074,7 +2162,7 @@ ${logoImg}
 </div>
 <h3 style="text-align:center;margin:10px 0;">كشف حساب ${escapeHtml(partyName)}</h3>
 <table>
-<thead><tr><th>التاريخ</th><th>البيان</th><th>مدين</th><th>دائن</th><th>الأثر</th><th>الرصيد</th></tr></thead>
+<thead><tr><th>التاريخ</th><th>البيان</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr></thead>
 <tbody>${rows}</tbody>
 </table>
 <div class="footer">
@@ -2254,5 +2342,372 @@ ${logoImg}
             console.error(e);
             this.showToast('فشل العكس', 'error');
         }
+    }
+
+    // ===== دوال المشتريات =====
+
+    async generatePurchaseInvoiceNumber() {
+        const seq = (await this.db.getMeta('purchase_invoice_seq')) || 1;
+        await this.db.setMeta('purchase_invoice_seq', seq + 1);
+        return `PUR-${String(seq).padStart(5, '0')}`;
+    }
+
+    async savePurchaseInvoice() {
+        const supplierId = parseInt(document.getElementById('purchase-supplier-id').value, 10);
+        const paymentMethod = document.getElementById('purchase-payment-method').value;
+        const paidAmount = parseFloat(document.getElementById('purchase-paid-amount').value) || 0;
+        const notes = document.getElementById('purchase-notes').value;
+
+        if (!supplierId) {
+            this.showToast('اختر المورد', 'error');
+            return;
+        }
+
+        const supplierRow = await this.db.get('suppliers', supplierId);
+        if (!supplierRow) {
+            this.showToast('المورد غير موجود', 'error');
+            return;
+        }
+
+        if (!this.purchaseItems || this.purchaseItems.length === 0) {
+            this.showToast('أضف منتجات للفاتورة', 'error');
+            return;
+        }
+
+        const piNumber = await this.generatePurchaseInvoiceNumber();
+        const now = new Date().toISOString();
+
+        const prep = preparePurchaseInvoice({
+            supplierId,
+            supplierRow,
+            items: this.purchaseItems,
+            piNumber,
+            paymentMethod,
+            paidAmount,
+            notes,
+            currentUserName: this.currentUser.name,
+            now
+        });
+
+        if (prep.error) {
+            this.showToast(prep.error, 'error');
+            return;
+        }
+
+        try {
+            // تحديث المخزون
+            for (const item of this.purchaseItems) {
+                const product = await this.db.get('products', item.product_id);
+                if (product) {
+                    product.stock += item.quantity;
+                    await this.db.put('products', product);
+                }
+            }
+
+            // حفظ الفاتورة والقيود المحاسبية
+            await this.db.executeWrites(prep.ops);
+
+            // تحديث رصيد المورد
+            await this.syncPartyBalanceFromGl('supplier', supplierId);
+
+            // تسجيل النشاط
+            await this.logActivity('فاتورة شراء', `تم إنشاء فاتورة شراء ${piNumber} من ${supplierRow.name} بقيمة ${this.formatCurrency(prep.pi.total)}`);
+
+            this.showToast('تم حفظ فاتورة الشراء بنجاح', 'success');
+            this.closePurchaseModal();
+            this.purchaseItems = [];
+            this.loadPurchaseInvoices();
+            this.loadInventory();
+        } catch (err) {
+            this.showToast('خطأ: ' + err.message, 'error');
+        }
+    }
+
+    async savePurchaseReturn() {
+        const supplierId = parseInt(document.getElementById('return-supplier-id').value, 10);
+        const piId = parseInt(document.getElementById('return-pi-id').value, 10);
+        const notes = document.getElementById('return-notes').value;
+
+        if (!supplierId || !piId) {
+            this.showToast('اختر المورد وفاتورة الشراء', 'error');
+            return;
+        }
+
+        const supplierRow = await this.db.get('suppliers', supplierId);
+        if (!supplierRow) {
+            this.showToast('المورد غير موجود', 'error');
+            return;
+        }
+
+        if (!this.returnItems || this.returnItems.length === 0) {
+            this.showToast('أضف منتجات للمرتجع', 'error');
+            return;
+        }
+
+        const prNumber = `RET-${String(Date.now()).slice(-8)}`;
+        const now = new Date().toISOString();
+
+        const prep = preparePurchaseReturn({
+            supplierId,
+            supplierRow,
+            piId,
+            items: this.returnItems,
+            prNumber,
+            notes,
+            currentUserName: this.currentUser.name,
+            now
+        });
+
+        if (prep.error) {
+            this.showToast(prep.error, 'error');
+            return;
+        }
+
+        try {
+            // تحديث المخزون (تقليل الكمية)
+            for (const item of this.returnItems) {
+                const product = await this.db.get('products', item.product_id);
+                if (product) {
+                    product.stock = Math.max(0, product.stock - item.quantity);
+                    await this.db.put('products', product);
+                }
+            }
+
+            // حفظ المرتجع والقيود المحاسبية
+            await this.db.executeWrites(prep.ops);
+
+            // تحديث رصيد المورد
+            await this.syncPartyBalanceFromGl('supplier', supplierId);
+
+            // تسجيل النشاط
+            await this.logActivity('مرتجع شراء', `تم إنشاء مرتجع شراء ${prNumber} بقيمة ${this.formatCurrency(prep.pr.total)}`);
+
+            this.showToast('تم حفظ مرتجع الشراء بنجاح', 'success');
+            this.closeReturnModal();
+            this.returnItems = [];
+            this.loadPurchaseReturns();
+            this.loadInventory();
+        } catch (err) {
+            this.showToast('خطأ: ' + err.message, 'error');
+        }
+    }
+
+    async loadPurchasingScreen() {
+        await this.loadPurchaseInvoices();
+        await this.loadPurchaseReturns();
+        
+        // تحميل الموردين في الاختيارات
+        const suppliers = await this.db.getAll('suppliers');
+        const supplierSelect = document.getElementById('purchase-supplier-id');
+        const returnSupplierSelect = document.getElementById('return-supplier-id');
+        if (supplierSelect) {
+            supplierSelect.innerHTML = '<option value="">اختر المورد</option>' + suppliers.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+        }
+        if (returnSupplierSelect) {
+            returnSupplierSelect.innerHTML = '<option value="">اختر المورد</option>' + suppliers.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+        }
+        
+        // تحميل المنتجات في الاختيارات
+        const products = await this.getProducts(true);
+        const productSelect = document.getElementById('purchase-product-id');
+        const returnProductSelect = document.getElementById('return-product-id');
+        if (productSelect) {
+            productSelect.innerHTML = '<option value="">اختر المنتج</option>' + products.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+        }
+        if (returnProductSelect) {
+            returnProductSelect.innerHTML = '<option value="">اختر المنتج</option>' + products.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+        }
+        
+        // تحميل فواتير الشراء في اختيار المرتجعات
+        const invoices = await this.db.getAll('purchase_invoices');
+        const piSelect = document.getElementById('return-pi-id');
+        if (piSelect) {
+            piSelect.innerHTML = '<option value="">اختر فاتورة الشراء</option>' + invoices.map((pi) => `<option value="${pi.id}">${escapeHtml(pi.pi_number)} - ${escapeHtml(pi.supplier_name)}</option>`).join('');
+        }
+    }
+
+    async loadPurchaseInvoices() {
+        const invoices = (await this.db.getAll('purchase_invoices')).slice().reverse().slice(0, 100);
+        const tbody = document.getElementById('purchase-invoices-tbody');
+        if (!tbody) return;
+
+        if (invoices.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-state">لا توجد فواتير شراء</td></tr>';
+        } else {
+            tbody.innerHTML = invoices.map((pi) => `
+                <tr>
+                    <td>${escapeHtml(pi.pi_number)}</td>
+                    <td>${escapeHtml(pi.supplier_name)}</td>
+                    <td>${this.formatCurrency(pi.total)}</td>
+                    <td><span class="badge ${pi.status === 'paid' ? 'badge-success' : 'badge-warning'}">${pi.status === 'paid' ? 'مدفوعة' : 'معلقة'}</span></td>
+                    <td>${new Date(pi.created_at).toLocaleDateString('ar-SA')}</td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-outline" data-pi-action="view" data-id="${pi.id}"><i class="fas fa-eye"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+    }
+
+    async loadPurchaseReturns() {
+        const returns = (await this.db.getAll('purchase_returns')).slice().reverse().slice(0, 100);
+        const tbody = document.getElementById('purchase-returns-tbody');
+        if (!tbody) return;
+
+        if (returns.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-state">لا توجد مرتجعات شراء</td></tr>';
+        } else {
+            tbody.innerHTML = returns.map((pr) => `
+                <tr>
+                    <td>${escapeHtml(pr.pr_number)}</td>
+                    <td>${escapeHtml(pr.supplier_name)}</td>
+                    <td>${this.formatCurrency(pr.total)}</td>
+                    <td>${new Date(pr.created_at).toLocaleDateString('ar-SA')}</td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-outline" data-pr-action="view" data-id="${pr.id}"><i class="fas fa-eye"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+    }
+
+    addPurchaseItem() {
+        const productId = parseInt(document.getElementById('purchase-product-id').value, 10);
+        const quantity = parseInt(document.getElementById('purchase-quantity').value, 10) || 0;
+        const unitPrice = parseFloat(document.getElementById('purchase-unit-price').value) || 0;
+
+        if (!productId || quantity <= 0 || unitPrice <= 0) {
+            this.showToast('أدخل بيانات صحيحة', 'error');
+            return;
+        }
+
+        this.db.get('products', productId).then((product) => {
+            if (!product) {
+                this.showToast('المنتج غير موجود', 'error');
+                return;
+            }
+
+            const existingItem = this.purchaseItems.find((item) => item.product_id === productId);
+            if (existingItem) {
+                existingItem.quantity += quantity;
+            } else {
+                this.purchaseItems.push({
+                    product_id: productId,
+                    product_name: product.name,
+                    quantity,
+                    unit_price: unitPrice,
+                    total: quantity * unitPrice
+                });
+            }
+
+            document.getElementById('purchase-product-id').value = '';
+            document.getElementById('purchase-quantity').value = '';
+            document.getElementById('purchase-unit-price').value = '';
+            this.updatePurchaseItemsDisplay();
+        });
+    }
+
+    removePurchaseItem(index) {
+        this.purchaseItems.splice(index, 1);
+        this.updatePurchaseItemsDisplay();
+    }
+
+    updatePurchaseItemsDisplay() {
+        const container = document.getElementById('purchase-items-list');
+        if (!container) return;
+
+        const total = computePurchaseTotal(this.purchaseItems);
+        container.innerHTML = this.purchaseItems.map((item, idx) => `
+            <div class="purchase-item" style="padding: 8px; border: 1px solid var(--border); margin-bottom: 8px; border-radius: 4px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>${escapeHtml(item.product_name)}</span>
+                    <span>${item.quantity} × ${this.formatCurrency(item.unit_price)} = ${this.formatCurrency(item.total)}</span>
+                    <button type="button" class="btn btn-sm btn-danger" onclick="app.removePurchaseItem(${idx})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+
+        const totalEl = document.getElementById('purchase-total');
+        if (totalEl) totalEl.textContent = this.formatCurrency(total);
+    }
+
+    openPurchaseModal() {
+        this.purchaseItems = [];
+        document.getElementById('purchase-form').reset();
+        document.getElementById('purchase-modal').classList.add('active');
+        this.updatePurchaseItemsDisplay();
+    }
+
+    closePurchaseModal() {
+        document.getElementById('purchase-modal').classList.remove('active');
+    }
+
+    openReturnModal() {
+        this.returnItems = [];
+        document.getElementById('return-form').reset();
+        document.getElementById('return-modal').classList.add('active');
+    }
+
+    addReturnItem() {
+        const productId = parseInt(document.getElementById('return-product-id').value, 10);
+        const quantity = parseInt(document.getElementById('return-quantity').value, 10) || 0;
+
+        if (!productId || quantity <= 0) {
+            this.showToast('أدخل بيانات صحيحة', 'error');
+            return;
+        }
+
+        this.db.get('products', productId).then((product) => {
+            if (!product) {
+                this.showToast('المنتج غير موجود', 'error');
+                return;
+            }
+
+            const existingItem = this.returnItems.find((item) => item.product_id === productId);
+            if (existingItem) {
+                existingItem.quantity += quantity;
+            } else {
+                this.returnItems.push({
+                    product_id: productId,
+                    product_name: product.name,
+                    quantity,
+                    unit_price: product.cost_price,
+                    total: quantity * product.cost_price
+                });
+            }
+
+            document.getElementById('return-product-id').value = '';
+            document.getElementById('return-quantity').value = '1';
+            this.updateReturnItemsDisplay();
+        });
+    }
+
+    removeReturnItem(index) {
+        this.returnItems.splice(index, 1);
+        this.updateReturnItemsDisplay();
+    }
+
+    updateReturnItemsDisplay() {
+        const container = document.getElementById('return-items-list');
+        if (!container) return;
+
+        const total = computePurchaseTotal(this.returnItems);
+        container.innerHTML = this.returnItems.map((item, idx) => `
+            <div class="return-item" style="padding: 8px; border: 1px solid var(--border); margin-bottom: 8px; border-radius: 4px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>${escapeHtml(item.product_name)}</span>
+                    <span>${item.quantity} × ${this.formatCurrency(item.unit_price)} = ${this.formatCurrency(item.total)}</span>
+                    <button type="button" class="btn btn-sm btn-danger" onclick="app.removeReturnItem(${idx})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    closeReturnModal() {
+        document.getElementById('return-modal').classList.remove('active');
     }
 }

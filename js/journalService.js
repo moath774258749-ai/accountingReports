@@ -91,7 +91,7 @@ export function buildSaleJournal(journalId, p) {
             debit: paid,
             credit: 0,
             entry_kind: 'sale_cash',
-            memo: `قبض نقدي — فاتورة ${invoiceNumber}`
+            memo: `فاتورة ${invoiceNumber}`
         });
     }
     if (due > 0 && customerId) {
@@ -101,7 +101,7 @@ export function buildSaleJournal(journalId, p) {
             credit: 0,
             party_key: `customer:${customerId}`,
             entry_kind: 'sale_ar',
-            memo: `ذمم مدينة — فاتورة ${invoiceNumber}`
+            memo: `فاتورة ${invoiceNumber}`
         });
     }
     if (discount > 0) {
@@ -110,7 +110,7 @@ export function buildSaleJournal(journalId, p) {
             debit: discount,
             credit: 0,
             entry_kind: 'sales_discount',
-            memo: `خصم — فاتورة ${invoiceNumber}`
+            memo: `خصم ${invoiceNumber}`
         });
     }
     lines.push({
@@ -118,7 +118,7 @@ export function buildSaleJournal(journalId, p) {
         debit: 0,
         credit: subtotal,
         entry_kind: 'sale_revenue',
-        memo: `إيراد بيع — فاتورة ${invoiceNumber}`
+            memo: `فاتورة ${invoiceNumber}`
     });
 
     if (cost > 0) {
@@ -127,14 +127,14 @@ export function buildSaleJournal(journalId, p) {
             debit: cost,
             credit: 0,
             entry_kind: 'cogs',
-            memo: `تكلفة — فاتورة ${invoiceNumber}`
+            memo: `تكلفة ${invoiceNumber}`
         });
         lines.push({
             account_code: AC.INV,
             debit: 0,
             credit: cost,
             entry_kind: 'inv_issue',
-            memo: `تخفيض مخزون — فاتورة ${invoiceNumber}`
+            memo: `تخفيض مخزون ${invoiceNumber}`
         });
     }
 
@@ -161,7 +161,7 @@ export function buildReturnJournal(journalId, p) {
         debit: subtotal,
         credit: 0,
         entry_kind: 'return_revenue',
-        memo: `عكس إيراد — مرتجع ${invoiceNumber}`
+            memo: `مرتجع ${invoiceNumber}`
     });
     if (discount > 0) {
         lines.push({
@@ -169,7 +169,7 @@ export function buildReturnJournal(journalId, p) {
             debit: 0,
             credit: discount,
             entry_kind: 'return_discount',
-            memo: `عكس خصم — مرتجع ${invoiceNumber}`
+            memo: `خصم مرتجع ${invoiceNumber}`
         });
     }
     if (paid > 0) {
@@ -178,7 +178,7 @@ export function buildReturnJournal(journalId, p) {
             debit: 0,
             credit: paid,
             entry_kind: 'return_cash',
-            memo: `رد نقدي — مرتجع ${invoiceNumber}`
+            memo: `مرتجع ${invoiceNumber}`
         });
     }
     if (due > 0 && customerId) {
@@ -188,7 +188,7 @@ export function buildReturnJournal(journalId, p) {
             credit: due,
             party_key: `customer:${customerId}`,
             entry_kind: 'return_ar',
-            memo: `تخفيض ذمم — مرتجع ${invoiceNumber}`
+            memo: `مرتجع ${invoiceNumber}`
         });
     }
 
@@ -198,14 +198,14 @@ export function buildReturnJournal(journalId, p) {
             debit: cost,
             credit: 0,
             entry_kind: 'inv_return',
-            memo: `إرجاع مخزون — مرتجع ${invoiceNumber}`
+            memo: `إرجاع مخزون ${invoiceNumber}`
         });
         lines.push({
             account_code: AC.COGS,
             debit: 0,
             credit: cost,
             entry_kind: 'cogs_return',
-            memo: `عكس تكلفة — مرتجع ${invoiceNumber}`
+            memo: `تكلفة مرتجع ${invoiceNumber}`
         });
     }
 
@@ -228,7 +228,7 @@ export function buildExpenseJournal(journalId, p) {
             debit: 0,
             credit: amount,
             entry_kind: 'expense_cash',
-            memo: memo || 'سداد نقدي — مصروف'
+            memo: memo || 'مصروف'
         }
     ];
     assertBalanced(lines);
@@ -244,7 +244,7 @@ export function buildReceiptVoucherJournal(journalId, p) {
             debit: amount,
             credit: 0,
             entry_kind: 'receipt_cash',
-            memo: memo || `سند قبض ${voucherNumber}`
+            memo: memo || `قبض ${voucherNumber}`
         },
         {
             account_code: AC.AR,
@@ -252,7 +252,7 @@ export function buildReceiptVoucherJournal(journalId, p) {
             credit: amount,
             party_key: `customer:${partyId}`,
             entry_kind: 'receipt_ar',
-            memo: memo || `سند قبض ${voucherNumber}`
+            memo: memo || `قبض ${voucherNumber}`
         }
     ];
     assertBalanced(lines);
@@ -269,14 +269,14 @@ export function buildSupplierPaymentJournal(journalId, p) {
             credit: 0,
             party_key: `supplier:${partyId}`,
             entry_kind: 'payment_ap',
-            memo: memo || `سند صرف ${voucherNumber}`
+            memo: memo || `صرف ${voucherNumber}`
         },
         {
             account_code: AC.CASH,
             debit: 0,
             credit: amount,
             entry_kind: 'payment_cash',
-            memo: memo || `سند صرف ${voucherNumber}`
+            memo: memo || `صرف ${voucherNumber}`
         }
     ];
     assertBalanced(lines);
@@ -292,7 +292,7 @@ export function buildReversalJournal(journalId, entriesToReverse, now, reason) {
         credit: Number(e.debit) || 0,
         party_key: e.party_key,
         entry_kind: 'reversal',
-        memo: `عكس - ${reason || e.memo || ''}`
+        memo: `${reason || e.memo || ''}`
     }));
     assertBalanced(lines);
     return journalLinesToAccountEntries(journalId, lines, refType, 'reversal', refKey + '-REV', now);

@@ -1,4 +1,4 @@
-/** @typedef {'admin'|'manager'|'cashier'} Role */
+/** @typedef {'admin'|'manager'|'cashier'|'developer'} Role */
 
 export const CONFIG = {
     CURRENCY: 'ريال',
@@ -20,14 +20,16 @@ export const CONFIG = {
 export const ROLES = {
     ADMIN: 'admin',
     MANAGER: 'manager',
-    CASHIER: 'cashier'
+    CASHIER: 'cashier',
+    DEVELOPER: 'developer'
 };
 
-/** Admin-only: view_cost, view_reports, manage_users. Manager: operations without cost/reports/user admin. Manager: can manage products. Cashier: POS + vouchers + statements. */
+/** Admin-only: view_cost, view_reports, manage_users. Manager: operations without cost/reports/user admin. Manager: can manage products. Cashier: POS + vouchers + statements. Developer: system initialization and reset. */
 export const PERMISSIONS = {
     admin: ['view_reports', 'view_cost', 'manage_users', 'manage_settings', 'manage_products', 'delete_records', 'view_all'],
     manager: ['manage_products'],
-    cashier: ['pos_only', 'create_vouchers', 'print_statements']
+    cashier: ['pos_only', 'create_vouchers', 'print_statements'],
+    developer: ['system_init', 'reset_database', 'view_all', 'manage_users']
 };
 
 export const SESSION_TTL_MS = 12 * 60 * 60 * 1000;

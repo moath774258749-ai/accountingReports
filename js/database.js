@@ -3,7 +3,7 @@
  */
 
 const DB_NAME = 'SmartStoreDB';
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 
 export class Database {
     constructor() {
@@ -93,6 +93,32 @@ export class Database {
 
                 if (!db.objectStoreNames.contains('meta')) {
                     db.createObjectStore('meta', { keyPath: 'key' });
+                }
+
+                // جداول المشتريات
+                if (!db.objectStoreNames.contains('purchase_orders')) {
+                    const store = db.createObjectStore('purchase_orders', { keyPath: 'id', autoIncrement: true });
+                    store.createIndex('po_number', 'po_number', { unique: true });
+                    store.createIndex('supplier_id', 'supplier_id');
+                    store.createIndex('created_at', 'created_at');
+                    store.createIndex('status', 'status');
+                }
+
+                if (!db.objectStoreNames.contains('purchase_invoices')) {
+                    const store = db.createObjectStore('purchase_invoices', { keyPath: 'id', autoIncrement: true });
+                    store.createIndex('pi_number', 'pi_number', { unique: true });
+                    store.createIndex('supplier_id', 'supplier_id');
+                    store.createIndex('created_at', 'created_at');
+                    store.createIndex('po_id', 'po_id');
+                    store.createIndex('status', 'status');
+                }
+
+                if (!db.objectStoreNames.contains('purchase_returns')) {
+                    const store = db.createObjectStore('purchase_returns', { keyPath: 'id', autoIncrement: true });
+                    store.createIndex('pr_number', 'pr_number', { unique: true });
+                    store.createIndex('supplier_id', 'supplier_id');
+                    store.createIndex('pi_id', 'pi_id');
+                    store.createIndex('created_at', 'created_at');
                 }
             };
         });

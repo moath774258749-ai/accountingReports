@@ -941,6 +941,12 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link" data-screen="purchasing">
+                        <i class="fas fa-shopping-cart"></i>
+                        المشتريات
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link" data-screen="reports">
                         <i class="fas fa-chart-bar"></i>
                         التقارير
@@ -1264,6 +1270,14 @@
                             حفظ الإعدادات
                         </button>
                     </div>
+                    <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
+                        <h4 style="margin-bottom: 12px; color: var(--danger);">منطقة الخطر</h4>
+                        <button class="btn btn-danger" id="reset-system-btn" style="display: none;">
+                            <i class="fas fa-redo"></i>
+                            إعادة تعيين النظام
+                        </button>
+                        <p style="font-size: 12px; color: var(--gray); margin-top: 8px;">متاح فقط لمستخدم المطور</p>
+                    </div>
                 </div>
                 <div class="card" id="users-admin-card" style="margin-top: 20px;">
                     <h3 style="margin-bottom: 16px;">المستخدمون</h3>
@@ -1287,6 +1301,154 @@
                         <i class="fas fa-upload"></i> استعادة نسخة
                         <input type="file" id="import-backup-input" accept="application/json" style="display: none;">
                     </label>
+                </div>
+            </div>
+
+            <!-- Purchasing Screen -->
+            <div class="screen" id="purchasing-screen">
+                <div class="tabs" style="margin-bottom: 20px;">
+                    <button type="button" class="tab active" data-purchase-tab="invoices">فواتير الشراء</button>
+                    <button type="button" class="tab" data-purchase-tab="returns">مرتجعات</button>
+                </div>
+                <div class="card">
+                    <button type="button" class="btn btn-primary" id="add-purchase-invoice-btn" style="margin-bottom: 16px;">
+                        <i class="fas fa-plus"></i> فاتورة شراء جديدة
+                    </button>
+                    <button type="button" class="btn btn-outline" id="add-purchase-return-btn" style="margin-bottom: 16px; display: none;">
+                        <i class="fas fa-plus"></i> مرتجع جديد
+                    </button>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>رقم الفاتورة</th>
+                                <th>المورد</th>
+                                <th>الإجمالي</th>
+                                <th>الحالة</th>
+                                <th>التاريخ</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="purchase-invoices-tbody"></tbody>
+                    </table>
+                </div>
+                <div class="card" id="purchase-returns-card" style="display: none; margin-top: 20px;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>رقم المرتجع</th>
+                                <th>المورد</th>
+                                <th>الإجمالي</th>
+                                <th>التاريخ</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="purchase-returns-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Purchase Invoice Modal -->
+            <div class="modal" id="purchase-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>فاتورة شراء جديدة</h3>
+                        <button type="button" class="btn-close" onclick="app.closePurchaseModal()"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="purchase-form">
+                            <div class="form-group">
+                                <label class="form-label">المورد *</label>
+                                <select id="purchase-supplier-id" required></select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">طريقة الدفع *</label>
+                                <select id="purchase-payment-method">
+                                    <option value="cash">نقداً</option>
+                                    <option value="credit">آجلاً</option>
+                                </select>
+                            </div>
+                            <div class="form-group" id="paid-amount-group" style="display: none;">
+                                <label class="form-label">المبلغ المدفوع</label>
+                                <input type="number" id="purchase-paid-amount" value="0" min="0" step="0.01">
+                            </div>
+                            <div style="border: 1px solid var(--border); padding: 12px; border-radius: 4px; margin-bottom: 16px;">
+                                <h4 style="margin-bottom: 12px;">إضافة منتجات</h4>
+                                <div class="form-group">
+                                    <label class="form-label">المنتج</label>
+                                    <select id="purchase-product-id"></select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">الكمية</label>
+                                    <input type="number" id="purchase-quantity" value="1" min="1">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">سعر الوحدة</label>
+                                    <input type="number" id="purchase-unit-price" value="0" min="0" step="0.01">
+                                </div>
+                                <button type="button" class="btn btn-primary" onclick="app.addPurchaseItem()">
+                                    <i class="fas fa-plus"></i> إضافة
+                                </button>
+                            </div>
+                            <div id="purchase-items-list" style="margin-bottom: 16px;"></div>
+                            <div class="form-group">
+                                <label class="form-label">الإجمالي</label>
+                                <div style="font-size: 18px; font-weight: bold; padding: 8px; background: var(--light); border-radius: 4px;" id="purchase-total">0.00 ريال</div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">ملاحظات</label>
+                                <textarea id="purchase-notes" rows="3"></textarea>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" onclick="app.closePurchaseModal()">إغلاق</button>
+                        <button type="button" class="btn btn-primary" onclick="app.savePurchaseInvoice()">حفظ</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Purchase Return Modal -->
+            <div class="modal" id="return-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>مرتجع شراء جديد</h3>
+                        <button type="button" class="btn-close" onclick="app.closeReturnModal()"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="return-form">
+                            <div class="form-group">
+                                <label class="form-label">المورد *</label>
+                                <select id="return-supplier-id" required></select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">فاتورة الشراء *</label>
+                                <select id="return-pi-id" required></select>
+                            </div>
+                            <div style="border: 1px solid var(--border); padding: 12px; border-radius: 4px; margin-bottom: 16px;">
+                                <h4 style="margin-bottom: 12px;">منتجات المرتجع</h4>
+                                <div class="form-group">
+                                    <label class="form-label">المنتج</label>
+                                    <select id="return-product-id"></select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">الكمية</label>
+                                    <input type="number" id="return-quantity" value="1" min="1">
+                                </div>
+                                <button type="button" class="btn btn-primary" onclick="app.addReturnItem()">
+                                    <i class="fas fa-plus"></i> إضافة
+                                </button>
+                            </div>
+                            <div id="return-items-list" style="margin-bottom: 16px;"></div>
+                            <div class="form-group">
+                                <label class="form-label">ملاحظات</label>
+                                <textarea id="return-notes" rows="3"></textarea>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" onclick="app.closeReturnModal()">إغلاق</button>
+                        <button type="button" class="btn btn-primary" onclick="app.savePurchaseReturn()">حفظ</button>
+                    </div>
                 </div>
             </div>
 
